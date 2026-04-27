@@ -957,7 +957,8 @@ MonoBehaviour:
   moveSpeed: 8
   rotateSpeed: 8
   focusScaleMultiplier: 1.5
-  returnKey: 98
+  useLeftPrimaryButtonForBack: 1
+  useLeftSecondaryButtonForBack: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
