@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.XR;
 
 public class SteeringNavigation : MonoBehaviour
 {
@@ -14,6 +15,10 @@ public class SteeringNavigation : MonoBehaviour
 
     public bool flyInLookDirection = true;
 
+    [Header("Dataset Rotation")]
+    public Transform datasetRoot;
+    public float datasetSpinSpeed = 60f;
+
     private void OnEnable()
     {
         moveAction.action?.Enable();
@@ -24,10 +29,14 @@ public class SteeringNavigation : MonoBehaviour
     {
         if (headCamera == null) return;
 
-        Vector2 left = moveAction.action != null ? moveAction.action.ReadValue<Vector2>() : Vector2.zero;
-        Vector2 rightStick = verticalAction.action != null ? verticalAction.action.ReadValue<Vector2>() : Vector2.zero;
+        Vector2 left = moveAction.action != null
+            ? moveAction.action.ReadValue<Vector2>()
+            : Vector2.zero;
 
-        // Debug: check Console while moving right joystick up/down
+        Vector2 rightStick = verticalAction.action != null
+            ? verticalAction.action.ReadValue<Vector2>()
+            : Vector2.zero;
+
         if (Mathf.Abs(rightStick.y) > 0.1f)
             Debug.Log("RIGHT STICK Y = " + rightStick.y);
 
@@ -51,5 +60,39 @@ public class SteeringNavigation : MonoBehaviour
 
         float turn = rightStick.x * turnSpeed * Time.deltaTime;
         transform.Rotate(Vector3.up, turn);
+
+        RotateDatasetWithGrip(rightStick);
     }
+
+   private void RotateDatasetWithGrip(Vector2 rightStick)
+{
+    if (datasetRoot == null)
+        return;
+
+    UnityEngine.XR.InputDevice rightDevice =
+        UnityEngine.XR.InputDevices.GetDeviceAtXRNode(
+            UnityEngine.XR.XRNode.RightHand
+        );
+
+    bool rightGrip;
+
+    if (!rightDevice.TryGetFeatureValue(
+            UnityEngine.XR.CommonUsages.gripButton,
+            out rightGrip))
+        return;
+
+    if (!rightGrip)
+        return;
+
+    float spin =
+        rightStick.x *
+        datasetSpinSpeed *
+        Time.deltaTime;
+
+    datasetRoot.Rotate(
+        Vector3.up,
+        spin,
+        Space.World
+    );
+}
 }

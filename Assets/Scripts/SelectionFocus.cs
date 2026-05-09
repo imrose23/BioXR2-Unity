@@ -1,65 +1,91 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.XR;
 
 public class SelectionFocus : MonoBehaviour
 {
     [Header("References")]
-    public Transform headCamera;
-    public Transform rayOrigin;   // Right Controller / Near-Far Interactor / Ray Transform
+    public Transform rayOrigin;
 
-    [Header("Input")]
-    public InputActionProperty focusAction;
-
-    [Header("Ray Settings")]
+    [Header("Ray")]
     public float rayDistance = 100f;
-    public LayerMask selectableLayers = ~0;
 
-    [Header("Focus Settings")]
-    public float focusDistance = 1.5f;
-    public float moveSpeed = 3.0f;
+    [Header("Marker")]
+    public GameObject markerPrefab;
+    public float markerScale = 0.03f;
 
-    private bool isMoving = false;
-    private Vector3 targetRigPosition;
+    private GameObject currentMarker;
+    private bool wasPressedLastFrame = false;
 
     void Update()
     {
-        if (headCamera == null || rayOrigin == null) return;
+        if (rayOrigin == null) return;
 
-        if (focusAction.action.WasPressedThisFrame())
+        InputDevice rightHand = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+
+        bool triggerPressed = false;
+        rightHand.TryGetFeatureValue(CommonUsages.triggerButton, out triggerPressed);
+
+        if (triggerPressed && !wasPressedLastFrame)
         {
-            TryFocus();
+            SelectPoint();
         }
 
-        if (isMoving)
-        {
-            transform.position = Vector3.Lerp(
-                transform.position,
-                targetRigPosition,
-                moveSpeed * Time.deltaTime
-            );
-
-            if (Vector3.Distance(transform.position, targetRigPosition) < 0.03f)
-            {
-                isMoving = false;
-            }
-        }
+        wasPressedLastFrame = triggerPressed;
     }
 
-    void TryFocus()
+    void SelectPoint()
     {
         Ray ray = new Ray(rayOrigin.position, rayOrigin.forward);
 
-        if (Physics.Raycast(ray, out RaycastHit hit, rayDistance, selectableLayers))
-        {
-            Vector3 hitPoint = hit.point;
-            targetRigPosition = hitPoint - headCamera.forward * focusDistance;
-            isMoving = true;
+        RaycastHit[] hits = Physics.RaycastAll(ray, rayDistance);
 
-            Debug.Log("Focus target hit: " + hit.collider.name);
-        }
-        else
+        if (hits.Length == 0)
         {
-            Debug.Log("No focus target hit.");
+            Debug.Log("No hit.");
+            return;
         }
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (RaycastHit hit in hits)
+        {
+            // ignore parent box collider
+            if (hit.collider is BoxCollider)
+                continue;
+
+            // use only mesh collider hits
+            if (hit.collider is MeshCollider)
+            {
+                Debug.Log(
+                    "Selected point on: " + hit.collider.name +
+                    " | position: " + hit.point
+                );
+
+                PlaceMarker(hit.point);
+
+                return;
+            }
+        }
+
+        Debug.Log("Hit something, but no mesh collider selected.");
+    }
+
+    void PlaceMarker(Vector3 position)
+    {
+        if (currentMarker == null)
+        {
+            if (markerPrefab != null)
+            {
+                currentMarker = Instantiate(markerPrefab);
+            }
+            else
+            {
+                currentMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(currentMarker.GetComponent<Collider>());
+            }
+        }
+
+        currentMarker.transform.position = position;
+        currentMarker.transform.localScale = Vector3.one * markerScale;
     }
 }
